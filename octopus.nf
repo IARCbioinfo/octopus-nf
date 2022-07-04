@@ -81,19 +81,20 @@ indel_vcf_tbi = file( params.indel_vcf+'.tbi' )
 bed = file ( params.bed )
 
 pairs = Channel.fromPath(params.tn_pairs).splitCsv(header: true, sep: '\t', strip: true)
-	.map{ row -> [ row.sample , file(row.tumor), file(row.tumor+'.bai'), file(row.normal), file(row.normal+'.bai'), row.SM ]}
+	.map{ row -> [ row.sample , file(row.tumor), file(row.tumor+'.bai'), file(row.normal), file(row.normal+'.bai') ]}
 			
 process run_octopus {
 
     cpus params.cpu
     memory params.mem+'GB'
 
-    container = 'file:///home/cahaisv/singularity/octopus.sif'
+    //container = 'docker://iarcbioinfo/octopus.sif'
  
     publishDir params.output_folder+"/VCFs/raw", mode: 'copy', pattern: "*vcf*"
 
      input:
-     set val(sample), file(bamT), file(baiT) , file(bamN), file(baiN), val(SM) from pairs
+     //set val(sample), file(bamT), file(baiT) , file(bamN), file(baiN), val(SM) from pairs
+     set val(sample), file(bamT), file(baiT) , file(bamN), file(baiN) from pairs
      file(snp_vcf)
      file(snp_vcf_tbi)
      file(indel_vcf)
@@ -108,9 +109,10 @@ process run_octopus {
      shell:
      output_prefix="${bamT}_vs_${bamN}.somatic"
      '''
-     #SM=`samtools view -H !{bamN} | grep '^@RG' | sed "s/.*SM://"`
-     #octopus -R !{fasta_ref} -I !{bamT} !{bamN} --normal-sample !{SM} --filter-vcf !{snp_vcf} !{indel_vcf} -o !{output_prefix}.vcf.gz --threads !{params.cpu} --regions !{bed}
-     octopus -R !{fasta_ref} -I !{bamT} !{bamN} --normal-sample !{SM} -o !{output_prefix}.vcf.gz --threads !{params.cpu} --regions-file !{bed}
+     SM=`samtools view -H !{bamN} | grep '^@RG' | sed "s/.*SM://"`
+     # --filter_vcf do not seem to be the parameter for dbsnp and dbindel filtering !?
+     #octopus -R !{fasta_ref} -I !{bamT} !{bamN} --normal-sample ${SM} -o !{output_prefix}.vcf.gz --threads !{params.cpu} --regions-file !{bed} -C cancer --filter-vcf !{snp_vcf} !{indel_vcf} --annotations AD ADP AF
+     octopus -R !{fasta_ref} -I !{bamT} !{bamN} --normal-sample ${SM} -o !{output_prefix}.vcf.gz --threads !{params.cpu} --regions-file !{bed} -C cancer --annotations AD ADP AF
      '''
   }
 
